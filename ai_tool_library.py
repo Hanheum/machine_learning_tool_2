@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 class layer():
     def plain(self, nods, activation, input_shape=None):
@@ -62,11 +63,40 @@ class Model():
             if count == len(self.layers)-1:
                 return A
 
-
     def train(self, optimizer, x_data, y_data, epochs=1):
         for epoch in range(epochs):
             print('epoch:{}'.format(int(epoch+1)))
             optimizer(x_data, y_data, self.trainable_variables, self.calculate_train)
+
+    def save(self, saving_path):
+        os.makedirs(saving_path)
+        for a, package in enumerate(self.trainable_variables):
+            os.makedirs(saving_path+'\\{}'.format(a))
+            for b, variable in enumerate(package):
+                os.makedirs(saving_path+'\\{}\\{}'.format(a, b))
+                file = open(saving_path+'\\{}\\{}\\save_file'.format(a, b), 'wb')
+                file.write(variable.tobytes())
+                file2 = open(saving_path+'\\{}\\{}\\shape.txt'.format(a, b), 'wb')
+                file2.write('{}'.format(np.shape(variable)).encode())
+
+    def load(self, file_path):
+        layer_folders = os.listdir(file_path)
+        loaded_variables = []
+        for folder in layer_folders:
+            elements = os.listdir(file_path+'\\{}'.format(folder))
+            package = []
+            for element in elements:
+                file_name = os.listdir(file_path+'\\{}\\{}'.format(folder, element))[0]
+                variable_shape_file_name = os.listdir(file_path+'\\{}\\{}'.format(folder, element))[1]
+                variable_shape_file_dir = file_path+'\\{}\\{}\\{}'.format(folder, element, variable_shape_file_name)
+                shape = open(variable_shape_file_dir, 'rb').read().decode()
+                shape = eval(shape)
+                file = open(file_path+'\\{}\\{}\\{}'.format(folder, element, file_name), 'rb').read()
+                variable = np.frombuffer(file, np.float64)
+                variable = np.reshape(variable, shape)
+                package.append(variable)
+            loaded_variables.append(package)
+        self.trainable_variables = loaded_variables
 
 def optimizer(x_data, y_data, trainable_variables, calculate_function, learning_rate=0.01):
     Zs, As = calculate_function(x_data)
