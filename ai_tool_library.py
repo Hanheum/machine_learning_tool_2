@@ -212,10 +212,10 @@ class Model():
             if count == len(self.layers)-1:
                 return A
 
-    def train(self, optimizer, x_data, y_data, epochs=1):
+    def train(self, optimizer, cost_function, x_data, y_data, epochs=1):
         for epoch in range(epochs):
             print('epoch:{}'.format(int(epoch+1)))
-            optimizer(x_data, y_data, self.trainable_variables, self.calculate_train)
+            optimizer(x_data, y_data, self.trainable_variables, self.predict, cost_function, self.layers_types)
 
     def save(self, saving_path):
         try:
@@ -280,4 +280,72 @@ def optimizer(x_data, y_data, trainable_variables, calculate_function, learning_
     for a, package in enumerate(trainable_variables):
         trainable_variables[a][0] = package[0]-learning_rate*packages[a][0]
         trainable_variables[a][1] = package[1]-learning_rate*packages[a][1]
+    return trainable_variables
+
+def MSE(predicted_Y, Y):
+    error = predicted_Y-Y
+    error_square = error**2
+    sum = np.sum(error_square)
+    cost = sum/len(Y)
+    return cost
+
+def optimizer_classic(x_data, y_data, trainable_variables, calculate_function, cost_function, layers_types, learning_rate=0.01):
+    very_small_unit = 0.0000001
+    predicted_Y = calculate_function(x_data)
+    cost = cost_function(predicted_Y, y_data)
+    print('cost:{}'.format(cost))
+    gradients = []
+    for count, trainable_variable in enumerate(trainable_variables):
+        try:
+            if trainable_variable == None:
+                gradients.append(None)
+                continue
+        except:
+            pass
+
+        if layers_types[count] == 'conv2D':
+            empty_clone = np.zeros(trainable_variable.shape)
+            for count2, one_filter in enumerate(trainable_variable):
+                for count3, one_line in enumerate(one_filter):
+                    for count4, one_element in enumerate(one_line):
+                        trainable_variables[count][count2][count3][count4] += very_small_unit
+                        second_predicted_Y = calculate_function(x_data)
+                        trainable_variables[count][count2][count3][count4] -= very_small_unit
+                        second_cost = cost_function(second_predicted_Y, y_data)
+                        gradient = (second_cost-cost)/very_small_unit
+                        empty_clone[count2][count3][count4] = gradient
+            gradients.append(empty_clone)
+
+        elif layers_types[count] == 'plain':
+            empty_clone1 = np.zeros(trainable_variable[0].shape)
+            for count2, one_line in enumerate(trainable_variable[0]):
+                for count3, one_element in enumerate(one_line):
+                    trainable_variables[count][0][count2][count3] += very_small_unit
+                    second_predicted_Y = calculate_function(x_data)
+                    trainable_variables[count][0][count2][count3] -= very_small_unit
+                    second_cost = cost_function(second_predicted_Y, y_data)
+                    gradient = (second_cost-cost)/very_small_unit
+                    empty_clone1[count2][count3] = gradient
+            empty_clone2 = np.zeros(trainable_variable[1].shape)
+            for count2, one_element in enumerate(trainable_variable[1]):
+                trainable_variables[count][1][count2] += very_small_unit
+                second_predicted_Y = calculate_function(x_data)
+                trainable_variables[count][1][count2] -= very_small_unit
+                second_cost = cost_function(second_predicted_Y, y_data)
+                gradient = (second_cost-cost)/very_small_unit
+                empty_clone2[count2] = gradient
+            clone_package = [empty_clone1, empty_clone2]
+            gradients.append(clone_package)
+
+    for count in range(len(trainable_variables)):
+        if trainable_variables[count] == None:
+            continue
+
+        if layers_types[count] == 'conv2D':
+            trainable_variables[count] = trainable_variables[count] - gradients[count]*learning_rate
+
+        elif layers_types[count] == 'plain':
+            trainable_variables[count][0] = trainable_variables[count][0] - gradients[count][0]*learning_rate
+            trainable_variables[count][1] = trainable_variables[count][1] - gradients[count][1]*learning_rate
+
     return trainable_variables
